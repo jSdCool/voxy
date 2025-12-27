@@ -9,8 +9,10 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -73,7 +75,23 @@ public abstract class MixinLevelRenderer implements IGetVoxyRenderSystem {
             Logger.error("Not creating renderer due to null instance");
             return;
         }
-        WorldEngine world = WorldIdentifier.ofEngine(this.level);
+        WorldEngine world;
+        try {
+             world = WorldIdentifier.ofEngine(this.level);
+        } catch (RuntimeException e){
+            Logger.error("Not creating renderer due to error while creating world engine",e);
+            VoxyConfig.CONFIG.enabled = false; //diable voxy
+
+            var vrsh = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
+            if (vrsh != null) {
+                vrsh.shutdownRenderer();
+            }
+            VoxyCommon.shutdownInstanceNoLock();
+            if(Minecraft.getInstance().player != null){
+                Minecraft.getInstance().player.displayClientMessage(Component.literal("Voxy automatically disabled"),false);
+            }//TODO figure out how to queue a chat message to be sent if it was not able to send one yet during world join
+            return;
+        }
         if (world == null) {
             Logger.error("Null world selected");
             return;

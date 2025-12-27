@@ -1,5 +1,7 @@
 package me.cortex.voxy.commonImpl;
 
+import me.cortex.voxy.client.config.VoxyConfig;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;

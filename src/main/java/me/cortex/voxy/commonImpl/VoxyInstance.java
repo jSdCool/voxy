@@ -13,6 +13,7 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
@@ -112,7 +113,13 @@ public abstract class VoxyInstance {
             }
         }
         if (world == null) {//If the cached world is null, try get from the active worlds
-            long stamp = this.activeWorldLock.readLock();
+            long stamp = 0;
+            try {
+                 stamp = this.activeWorldLock.tryReadLock(16, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException ignored){}
+            if(stamp == 0){
+                throw new IllegalStateException("Failed to acquire file read lock");//actually crash instead of waiting forever if the lock is held
+            }
             world = this.activeWorlds.get(identifier);
             this.activeWorldLock.unlockRead(stamp);
             if (world != null) {//Setup cache
@@ -256,6 +263,53 @@ public abstract class VoxyInstance {
         }
         Logger.info("Instance shutdown");
         this.activeWorldLock.unlockWrite(stamp);
+    }
+
+    public void shutdownNoLock(){//shutdown the renderer without requiring file locks to be obtainable
+        Logger.info("Shutting down voxy instance");
+        this.isRunning = false;
+        try {this.ingestService.shutdown();} catch (Exception e) {Logger.error(e);}
+        try {this.savingService.shutdown();} catch (Exception e) {Logger.error(e);}
+
+        if (!this.activeWorlds.isEmpty()) {
+            long stamp = this.activeWorldLock.tryReadLock();
+            if(stamp != 0) {//if not able to acquire the lock then just skip this
+                for (var world : this.activeWorlds.values()) {
+                    this.importManager.cancelImport(world);
+                }
+                this.activeWorldLock.unlockRead(stamp);
+            }
+        }
+
+        long stamp = this.activeWorldLock.tryWriteLock();
+
+        if (!this.activeWorlds.isEmpty() && stamp !=0) {//if acquiring the lock was successful
+            boolean printedNotice = false;
+            for (var world : this.activeWorlds.values()) {
+                if (world.isWorldUsed()) {
+                    if (!printedNotice) {
+                        printedNotice = true;
+                        Logger.error("Not all worlds shutdown, force closing worlds");
+                    }
+                    while (world.isWorldUsed()) {
+                        try {
+                            //noinspection BusyWait
+                            Thread.sleep(10);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+                //Free the world
+                world.free();
+            }
+            this.activeWorlds.clear();
+        }
+        try {this.threadPool.shutdown();} catch (Exception e) {Logger.error(e);}
+        Logger.info("Instance shutdown");
+        if(stamp!=0){
+            this.activeWorldLock.unlockWrite(stamp);
+        }
     }
 
     public boolean isIngestEnabled(WorldIdentifier worldId) {

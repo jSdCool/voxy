@@ -70,6 +70,14 @@ public class VoxyCommon implements ModInitializer {
         }
     }
 
+    public static void shutdownInstanceNoLock() {
+        if (INSTANCE != null) {
+            var instance = INSTANCE;
+            INSTANCE = null;//Make it null before shutdown
+            instance.shutdownNoLock();
+        }
+    }
+
     public static void createInstance() {
         if (FACTORY == null) {
             //Logger.info("Voxy factory");
