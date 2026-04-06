@@ -40,7 +40,7 @@ public class MixinRenderSectionManager {
     @Inject(method = "<init>", at = @At("TAIL"))
     private void voxy$resetChunkTracker(ClientLevel level, int renderDistance, SortBehavior sortBehavior, CommandList commandList, CallbackInfo ci) {
         if (level.levelRenderer != null) {
-            var system = ((IGetVoxyRenderSystem)(level.levelRenderer)).getVoxyRenderSystem();
+            var system = ((IGetVoxyRenderSystem)(level.levelRenderer)).voxy$getRenderSystem();
             if (system != null) {
                 system.chunkBoundRenderer.reset();
             }
@@ -49,7 +49,7 @@ public class MixinRenderSectionManager {
     }
 
     @Inject(method = "onChunkRemoved", at = @At("HEAD"))
-    private void injectIngest(int x, int z, CallbackInfo ci) {
+    private void voxy$injectIngest(int x, int z, CallbackInfo ci) {
         //TODO: Am not quite sure if this is right
         if (VoxyConfig.CONFIG.ingestEnabled && !BOBBY_INSTALLED && VoxyConfig.CONFIG.enabled) {
             var cccm = (ICheekyClientChunkCache)this.level.getChunkSource();
@@ -106,7 +106,7 @@ public class MixinRenderSectionManager {
         if (flags == 0)//Only process things with stuff
             return true;
 
-        VoxyRenderSystem system = ((IGetVoxyRenderSystem)(this.level.levelRenderer)).getVoxyRenderSystem();
+        VoxyRenderSystem system = ((IGetVoxyRenderSystem)(this.level.levelRenderer)).voxy$getRenderSystem();
         if (system == null) {
             return true;
         }
@@ -116,7 +116,7 @@ public class MixinRenderSectionManager {
             var tracker = ((AccessorChunkTracker)ChunkTrackerHolder.get(this.level)).getChunkStatus();
             //in theory the cache value could be wrong but is so soso unlikely and at worst means we either duplicate ingest a chunk
             // which... could be bad ;-; or we dont ingest atall which is ok!
-            long key = ChunkPos.asLong(x, z);
+            long key = ChunkPos.pack(x, z);
             if (key != this.cachedChunkPos) {
                 this.cachedChunkPos = key;
                 this.cachedChunkStatus = tracker.getOrDefault(key, 0);
