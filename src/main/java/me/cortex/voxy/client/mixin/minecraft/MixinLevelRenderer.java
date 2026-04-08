@@ -88,11 +88,11 @@ public abstract class MixinLevelRenderer implements IGetVoxyRenderSystem {
 
             var vrsh = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
             if (vrsh != null) {
-                vrsh.shutdownRenderer();
+                vrsh.voxy$shutdownRenderer();
             }
             VoxyCommon.shutdownInstanceNoLock();
             if(Minecraft.getInstance().player != null){
-                Minecraft.getInstance().player.displayClientMessage(Component.literal("Voxy automatically disabled"),false);
+                Minecraft.getInstance().player.sendSystemMessage(Component.literal("Voxy automatically disabled"));
             }//TODO figure out how to queue a chat message to be sent if it was not able to send one yet during world join
             return;
         }
